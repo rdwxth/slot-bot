@@ -4,6 +4,11 @@ import datetime
 import json
 import os
 from colorama import Fore
+import discord
+import datetime
+import json
+from discord.ext.commands import cooldown, BucketType
+
 intents = discord.Intents().all()
 bot = commands.Bot(command_prefix=',', intents = intents)
 bot.remove_command("help")
@@ -21,6 +26,7 @@ rid = hmm["premiumeroleid"]
 cid = hmm["categoryid"]
 staff = hmm["staffrole"]
 print(rid)
+
 @tasks.loop(hours=1)
 async def expire():
     try:
@@ -35,7 +41,7 @@ async def expire():
 
     for xd in data:
         for item in xd:
-            slottime = item["endtime"]
+            slottime = int(item["endtime"])
             st = datetime.datetime.fromtimestamp(int(slottime))
             print(st.strftime("%Y%m%d"))
             finalse = st.strftime("%Y%m%d")
@@ -314,75 +320,96 @@ async def revoke(ctx,member: discord.Member=None, channel: discord.TextChannel =
     await channel.set_permissions(member, send_messages=True,mention_everyone=False)
     await ctx.reply("successfully removed")
 
+@commands.cooldown(1, 86400, commands.BucketType.user)
+@bot.command()
+async def here(ctx):
+    """Ping @here and apply a 1-day cooldown."""
+    await ctx.send("@here")
+    await ctx.send("Cooldown: 1 day")
 
 
 @bot.command()
 @commands.has_role(int(staff))
-async def create(ctx,member: discord.Member=None,yoyo: int = None,cx=None,*,x=None):
-
-    if member == None:
+async def create(ctx, member: discord.Member = None, yoyo: int = None, cx=None, *, x=None):
+    """Create a slot with embedded slot rules."""
+    if member is None:
         await ctx.reply("User Not Found")
         return
 
-    if yoyo == None:
-        await ctx.reply("Use valid Formate: ,add @user 1 m his Slot")
-        return
-    
-    if cx == None:
-        await ctx.reply("Use valid Formate: ,add @user 1 m his Slot")
+    if yoyo is None:
+        await ctx.reply("Use valid Format: ,create @user 1 m his Slot")
         return
 
-    
-    if (x == None):
+    if cx is None:
+        await ctx.reply("Use valid Format: ,create @user 1 m his Slot")
+        return
+
+    if x is None:
         x = member.display_name
 
     overwrites = {
-    ctx.guild.default_role: discord.PermissionOverwrite(view_channel=True,send_messages=False),
-    member: discord.PermissionOverwrite(view_channel=True,send_messages=True,mention_everyone=True)
-}
-    
-    
+        ctx.guild.default_role: discord.PermissionOverwrite(view_channel=True, send_messages=False),
+        member: discord.PermissionOverwrite(view_channel=True, send_messages=True, mention_everyone=True)
+    }
 
     category = discord.utils.get(ctx.guild.categories, id=int(cid))
 
-    a = await ctx.guild.create_text_channel(x,category=category,overwrites=overwrites)
+    a = await ctx.guild.create_text_channel(x, category=category, overwrites=overwrites)
 
     await a.set_permissions(ctx.guild.default_role, send_messages=False)
     role = discord.utils.get(ctx.author.guild.roles, id=int(rid))
     await member.add_roles(role)
 
-    embed = discord.Embed(description="""Your Slot Rules *""",color=0xFFFF00)
+    # Embed Slot Rules
+    rules_text = (
+        "1. You can't use @everyone ping.\n"
+        "2. You can't sell your slot.\n"
+        "3. You can't share your slot.\n"
+        "4. You can't be marked on SA.\n"
+        "5. You can't advertise your server in your slot.\n"
+        "6. You can't use more than the daily pings.\n"
+        "7. You can't refuse to use me as MM.\n"
+        "8. You can't refuse to refund your customer if you can't replace it.\n"
+        "9. You can't scam.\n"
+        "10. You need to provide TOS in your slot.\n\n"
+        "**Respect the rules. If you break any rule, your slot will be revoked without refund or a warning.**"
+    )
 
-    embed.set_author(name="Slot Rules")
-    embed.set_thumbnail(url=ctx.guild.icon)
+    rules_embed = discord.Embed(description=f"**Slot Rules for {x}**\n\n{rules_text}", color=0xFFFF00)
+    rules_embed.set_author(name="Slot Rules")
+    rules_embed.set_thumbnail(url=ctx.guild.icon)
 
-    await a.send(embed=embed)
+    await a.send(embed=rules_embed)
 
-    if (cx.lower() == "d"):
+    if cx.lower() == "d":
         yoyo = (yoyo * 24 * 60 * 60) + datetime.datetime.now().timestamp()
-    elif (cx.lower() == "m"):
+    elif cx.lower() == "m":
         yoyo = (yoyo * 30 * 24 * 60 * 60) + datetime.datetime.now().timestamp()
     else:
-        await ctx.reply("Use valid Formate: ,add @user 1 m his Slot")
-        
-    embed = discord.Embed(description=f'**Slot Owner:** {member.mention}\n**End:** <t:{int(yoyo)}:R>',color=0xFFFF00)
-    embed.set_footer(text=ctx.guild.name)
-    embed.set_author(name=member)
-    await a.send(embed=embed)
-    await ctx.reply(f"successfully Create Slot {a.mention}")
+        await ctx.reply("Use valid Format: ,create @user 1 m his Slot")
+
+    end_embed = discord.Embed(description=f'**Slot Owner:** {member.mention}\n**End:** <t:{int(yoyo)}:R>', color=0xFFFF00)
+    end_embed.set_footer(text=ctx.guild.name)
+    end_embed.set_author(name=member)
+    await a.send(embed=end_embed)
+
+    await ctx.reply(f"Successfully Create Slot {a.mention}")
+
     dataz = {
         "endtime": yoyo,
         "userid": member.id,
         "channelid": a.id
-    },
+    }
+
     try:
         with open("data.json", "r") as file:
             data = json.load(file)
     except FileNotFoundError:
         data = []
+
     data.append(dataz)
-   
+
     with open("data.json", "w") as file:
-        json.dump(data, file,indent=4)
-  
-bot.run("Your bot Token")
+        json.dump(data, file, indent=4)
+
+bot.run("YOUR TOKEN")
